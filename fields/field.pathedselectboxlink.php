@@ -163,6 +163,87 @@
 	/*-------------------------------------------------------------------------
 		Output:
 	-------------------------------------------------------------------------*/
+
+		public function appendFormattedElement(&$wrapper, $data, $encode = false, $mode = null) {
+			if (!is_array($data) or empty($data)) return;
+			
+			$list = new XMLElement($this->get('element_name'));
+			
+			if (!is_array($data['relation_id'])) $data['relation_id'] = array($data['relation_id']);
+			
+			@header('content-type: text/plain');
+			
+			foreach ($data['relation_id'] as $id) {
+				$field = $this->__findPrimaryFieldValueFromRelationID($id);
+				$handle = Lang::createHandle($field['value']);
+				$value = $field['value'];
+				
+				if ($encode) {
+					$value = General::sanitize($field['value']);
+				}
+				
+				// List parents
+				if ($mode == 'recursive') {
+					$this->appendFormattedElementRecursive($list, $data, $encode);
+				}
+				
+				else {
+					$item = new XMLElement('item');
+					$item->setAttribute('handle', $handle);
+					$item->setAttribute('id', $id);
+					$item->setValue($value);
+					$list->appendChild($item);
+				}
+			}
+			
+			$wrapper->appendChild($list);
+		}
+		
+		protected function appendFormattedElementRecursive($wrapper, $data, $encode) {
+			if (!is_array($data) or empty($data)) return;
+			
+			if (!is_array($data['relation_id'])) $data['relation_id'] = array($data['relation_id']);
+			
+			foreach ($data['relation_id'] as $id) {
+				$field = $this->__findPrimaryFieldValueFromRelationID($id);
+				$handle = Lang::createHandle($field['value']);
+				$value = $field['value'];
+				
+				if ($encode) {
+					$value = General::sanitize($field['value']);
+				}
+				
+				$item = new XMLElement('item');
+				$item->setAttribute('handle', $handle);
+				$item->setAttribute('id', $id);
+				$item->setAttribute('value', $value);
+				
+				foreach ($this->get('related_field_id') as $field_id) {
+					$data = $this->Database->fetchRow(0, sprintf(
+						"
+							SELECT
+								a.*, b.relation_id
+							FROM
+								`tbl_entries_data_%d` AS a
+							LEFT JOIN
+								`tbl_entries_data_%d` AS b
+								ON b.entry_id = a.entry_id
+							WHERE
+								a.entry_id = %d
+						",
+						$field_id,
+						$this->get('id'),
+						$id
+					));
+					
+					if (is_null($data) or empty($data)) return;
+					
+					$this->appendFormattedElementRecursive($item, $data, $encode);
+				}
+				
+				$wrapper->appendChild($item);
+			}
+		}
 		
 		public function prepareTableValue($data, XMLElement $link = null) {
 			$output = ''; $results = array();
