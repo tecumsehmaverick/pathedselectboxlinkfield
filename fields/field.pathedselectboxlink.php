@@ -163,7 +163,14 @@
 	/*-------------------------------------------------------------------------
 		Output:
 	-------------------------------------------------------------------------*/
-
+		
+		public function fetchIncludableElements() {
+			return array(
+				$this->get('element_name'),
+				$this->get('element_name') . ': recursive'
+			);
+		}
+		
 		public function appendFormattedElement(&$wrapper, $data, $encode = false, $mode = null) {
 			if (!is_array($data) or empty($data)) return;
 			
