@@ -71,7 +71,7 @@
 			return $primary_field;
 		}
 		
-		public function findOptions(array $existing_selection = null) {
+		public function findOptions(array $existing_selection = null, $current_entry_id = null) {
 			$limit = $this->get('limit');
 			$related = $this->get('related_field_id');
 			$values = array();
@@ -121,7 +121,9 @@
 					}
 					
 					if (is_array($results) && !empty($results)) {
-						foreach ($results as $entry_id){
+						foreach ($results as $entry_id) {
+							if ($entry_id == $current_entry_id) continue;
+							
 							$value = $this->findPath($entry_id);
 							
 							$group['values'][$entry_id] = $value;
@@ -158,6 +160,61 @@
 			if ($parent_id) $value = $this->findPath($parent_id) . ' / ';
 			
 			return $value . $data['value'];
+		}
+		
+	/*-------------------------------------------------------------------------
+		Output:
+	-------------------------------------------------------------------------*/
+		
+		public function displayPublishPanel(&$wrapper, $data = null, $error = null, $prefix = null, $postfix = null, $entry_id = null) {
+			$handle = $this->get('element_name');
+			$entry_ids = array();
+			
+			if (!is_null($data['relation_id'])) {
+				if (!is_array($data['relation_id'])) {
+					$entry_ids = array($data['relation_id']);
+				}
+				
+				else {
+					$entry_ids = array_values($data['relation_id']);
+				}
+			}
+			
+			$states = $this->findOptions($entry_ids, $entry_id);
+			$options = array();
+			
+			if ($this->get('required') != 'yes') $options[] = array(null, false, null);
+			
+			if (!empty($states)) {
+				foreach ($states as $s) {
+					$group = array('label' => $s['name'], 'options' => array());
+					
+					foreach ($s['values'] as $id => $v) {
+						$group['options'][] = array($id, in_array($id, $entry_ids), $v);
+					}
+					
+					$options[] = $group;
+				}
+			}
+			
+			$fieldname = "fields{$prefix}[{$handle}]{$postfix}";
+			
+			if ($this->get('allow_multiple_selection') == 'yes') $fieldname .= '[]';
+			
+			$label = Widget::Label($this->get('label'));
+			$select = Widget::Select("fields{$prefix}[{$handle}]{$postfix}", $options);
+			
+			if ($this->get('allow_multiple_selection') == 'yes') {
+				$select->setAttribute('multiple', 'multiple');
+			}
+			
+			$label->appendChild($select);
+			
+			if ($error != null) {
+				$label = Widget::wrapFormElementWithError($label, $error);
+			}
+			
+			$wrapper->appendChild($label);
 		}
 		
 	/*-------------------------------------------------------------------------
