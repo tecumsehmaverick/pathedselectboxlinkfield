@@ -235,8 +235,6 @@
 			
 			if (!is_array($data['relation_id'])) $data['relation_id'] = array($data['relation_id']);
 			
-			@header('content-type: text/plain');
-			
 			foreach ($data['relation_id'] as $id) {
 				$field = $this->__findPrimaryFieldValueFromRelationID($id);
 				$handle = Lang::createHandle($field['value']);
