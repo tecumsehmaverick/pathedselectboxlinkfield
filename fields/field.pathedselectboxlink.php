@@ -124,7 +124,7 @@
 						foreach ($results as $entry_id) {
 							if ($entry_id == $current_entry_id) continue;
 							
-							$value = $this->findPath($entry_id);
+							$value = $this->findPathValue($entry_id);
 							
 							$group['values'][$entry_id] = $value;
 						}
@@ -140,8 +140,35 @@
 		}
 		
 		protected function findPath($entry_id) {
-			$value = ''; $data = $this->__findPrimaryFieldValueFromRelationID($entry_id);
-			$parent_id = $this->Database->fetchVar('relation_id', 0, sprintf(
+			$items = array();
+			
+			while (true) {
+				$data = $this->findPathItem($entry_id);
+				
+				$items[$entry_id] = $data['value'];
+				
+				if (empty($data['parent_id'])) break;
+				
+				$entry_id = $data['parent_id'];
+			}
+			
+			return $items;
+		}
+		
+		protected function findPathValue($entry_id) {
+			$items = $this->findPath($entry_id);
+			
+			if (empty($items)) return null;
+			
+			return implode(' / ', array_reverse($items));
+		}
+		
+		protected function findPathItem($entry_id) {
+			$data = $this->__findPrimaryFieldValueFromRelationID($entry_id);
+			
+			if (is_null($data)) return null;
+			
+			$data['parent_id'] = $this->Database->fetchVar('relation_id', 0, sprintf(
 				"
 					SELECT
 						d.relation_id
@@ -157,9 +184,7 @@
 				$entry_id
 			));
 			
-			if ($parent_id) $value = $this->findPath($parent_id) . ' / ';
-			
-			return $value . $data['value'];
+			return $data;
 		}
 		
 	/*-------------------------------------------------------------------------
@@ -266,44 +291,42 @@
 			
 			if (!is_array($data['relation_id'])) $data['relation_id'] = array($data['relation_id']);
 			
-			foreach ($data['relation_id'] as $id) {
-				$field = $this->__findPrimaryFieldValueFromRelationID($id);
-				$handle = Lang::createHandle($field['value']);
-				$value = $field['value'];
+			foreach ($data['relation_id'] as $relation_id) {
+				$items = $this->findPath($relation_id);
+				$last_item = $wrapper;
 				
-				if ($encode) {
-					$value = General::sanitize($field['value']);
-				}
+				if (empty($items)) continue;
 				
-				$item = new XMLElement('item');
-				$item->setAttribute('handle', $handle);
-				$item->setAttribute('id', $id);
-				$item->setAttribute('value', $value);
-				
-				foreach ($this->get('related_field_id') as $field_id) {
-					$data = $this->Database->fetchRow(0, sprintf(
+				foreach ($items as $id => $value) {
+					$section = $this->Database->fetchRow(0, sprintf(
 						"
 							SELECT
-								a.*, b.relation_id
+								s.name, s.handle
 							FROM
-								`tbl_entries_data_%d` AS a
+								`tbl_entries` AS e
 							LEFT JOIN
-								`tbl_entries_data_%d` AS b
-								ON b.entry_id = a.entry_id
+								`tbl_sections` AS s
+								ON s.id = e.section_id
 							WHERE
-								a.entry_id = %d
+								e.id = %d
+							LIMIT 1
 						",
-						$field_id,
-						$this->get('id'),
 						$id
 					));
 					
-					if (is_null($data) or empty($data)) return;
+					$item = new XMLElement('item');
+					$item->setAttribute('id', $id);
+					$item->setAttribute('handle', Lang::createHandle($value));
+					$item->setAttribute('value', General::sanitize($value));
 					
-					$this->appendFormattedElementRecursive($item, $data, $encode);
+					if (isset($section['name']) and isset($section['handle'])) {
+						$item->setAttribute('section-handle', $section['handle']);
+						$item->setAttribute('section-name', General::sanitize($section['name']));
+					}
+					
+					$last_item->appendChild($item);
+					$last_item = $item;
 				}
-				
-				$wrapper->appendChild($item);
 			}
 		}
 		
@@ -319,7 +342,7 @@
 			}
 			
 			foreach ($data['relation_id'] as $relation_id) {
-				$value = $this->findPath($relation_id);
+				$value = $this->findPathValue($relation_id);
 				$section = $this->Database->fetchVar('handle', 0, sprintf(
 					"
 						SELECT
