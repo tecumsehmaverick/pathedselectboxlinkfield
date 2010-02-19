@@ -215,7 +215,7 @@
 					$group = array('label' => $s['name'], 'options' => array());
 					
 					foreach ($s['values'] as $id => $v) {
-						$group['options'][] = array($id, in_array($id, $entry_ids), $v);
+						$group['options'][] = array($id, in_array($id, $entry_ids), General::sanitize($v));
 					}
 					
 					$options[] = $group;
@@ -278,7 +278,7 @@
 					$item = new XMLElement('item');
 					$item->setAttribute('handle', $handle);
 					$item->setAttribute('id', $id);
-					$item->setValue($value);
+					$item->setValue(General::sanitize($value));
 					$list->appendChild($item);
 				}
 			}
